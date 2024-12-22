@@ -1,0 +1,365 @@
+---
+title: "DPE_Report"
+author: "Daniel GNANGUENON"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r, fig.align='center', out.width='25%', echo=FALSE}
+knitr::include_graphics("C:/Users/gnang/Downloads/Opendataproject/Logo_EIGSI.png")
+```
+
+<center><h1 style="color: #FF6347;">**OPEN DATA PROJECT**</h1></center>
+<center><h1 style="color: #FF6347;">**Energy Performance Diagnostic**</h1></center>
+
+* This project aims to assess the impact of Energy Performance Certificate (EPC) ratings on actual electricity consumption in residential buildings by comparing EPC estimates with real-world data provided by Enedis. It provides information on the energy and environmental performance of a home or building by assessing its __energy consumption__ and its impact in terms of __greenhouse gas emissions__.
+
+* The objective is to quantify energy savings from EPC upgrades (in kWh/year and €/year) and analyze variations due to behavior and housing characteristics (heating type, insulation, etc.). 
+
+* In this project we will try to answers those 3 questions:
+
+1.	__How much do you save on your electricity bills by switching from one DPE class to another (e.g. from G to F, or from F to E, the value sought depending on the classes concerned)?__
+
+
+2. __Is there excessive energy consumption in France?__
+
+
+3. __What is the impact of the characteristics of the building or equipment (heating method, insulation, year of construction, etc.) on electricity consumption?__
+
+
+
+### __What dependencies or relationships exist between the variables under study?__
+
+```{r test1, message=FALSE, warning=FALSE, echo=FALSE}
+
+The<- read.csv("C:/Users/gnang/Downloads/Opendataproject/dpe-v2-tertiaire-2-depuis Juillet 2021.csv")
+library(dplyr)
+
+The<- The %>% select(-N.DPE, -Date_réception_DPE, -Date_fin_validité_DPE, -Date_établissement_DPE, -Date_visite_diagnostiqueur, -Modèle_DPE, -N._DPE_remplacé, -N._DPE_immeuble_associé, -Invariant_fiscal_logement, -N._immatriculation_copropriété, -Statut_géocodage, -Complément_d.adresse_bâtiment, -Complément_d.adresse_logement, -Cage_d.escalier, -Nom_résidence, -Nom__rue_.BAN., -N._voie_.BAN., -Adresse_brute, -N._étage_appartement, -Version_DPE, -Méthode_du_DPE, -Identifiant__BAN, -Adresse_.BAN., -Code_INSEE_.BAN., -Code_postal_.BAN., -Code_postal_.brut., -Nom__commune_.Brut.,-Année_relève_conso_énergie_n.3, -Année_relève_conso_énergie_n.2, -Année_relève_conso_énergie_n.1, -Coordonnée_cartographique_X_.BAN., -Coordonnée_cartographique_Y_.BAN., -N._région_.BAN., -Catégorie_ERP, -Secteur_activité, -Surface_.SHON., -N._département_.BAN., -Année_construction)
+
+The_t<- na.omit(The)
+The_t <- The_t[, c("Conso_kWhep.m..an","Emission_GES_kgCO2.m..an","Nombre_occupant","Surface_utile","Score_BAN","Conso_é_finale_énergie_n.1","Conso_é_primaire_énergie_n.1","Frais_annuel_énergie_n.1","Conso_é_finale_énergie_n.2","Conso_é_primaire_énergie_n.2","Frais_annuel_énergie_n.2","Conso_é_finale_énergie_n.3","Conso_é_primaire_énergie_n.3","Frais_annuel_énergie_n.3", "Période_construction", "Etiquette_DPE", "Etiquette_GES")]
+```
+
+```{r test2, message=FALSE, warning=FALSE, echo=FALSE}
+The_t1 <- The_t %>% mutate(Frais_annuel_énergie = Frais_annuel_énergie_n.1 + Frais_annuel_énergie_n.2 + Frais_annuel_énergie_n.3)
+library(corrplot)
+The_t1 <- The_t1[, c("Conso_kWhep.m..an","Emission_GES_kgCO2.m..an","Frais_annuel_énergie")]
+# Calculer la matrice de corrélation
+cor_matrix <- cor(The_t1)
+corrplot(cor_matrix, method = "color")
+```
+
+
+
+There is a *positive significant correlation* between consumption in KWhep/m² and greenhouse gas (GHG) emissions in KgCO2/m².
+
+
+
+
+** Let's validate this hypothesis with a linear regression. **
+
+
+
+```{r test10, message=FALSE, warning=FALSE, echo=FALSE}
+library(ggplot2)
+ggplot(The_t, aes(x = Conso_kWhep.m..an, y = Emission_GES_kgCO2.m..an)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(x = "consumption (kWh/m²/an)", y = "Emissions GHG (kgCO2/m²/an)") +
+  scale_y_continuous(limits = c(0, 20000))+
+scale_x_continuous(limits = c(0, 30000))
+```
+
+
+
+* The more energy we consume, the more GHGs we emit.
+* The blue line: This line represents a general trend. It suggests that there is a linear relationship between energy consumption and GHG emissions, i.e. as consumption increases, so do emissions.
+
+
+
+```{r test4, message=FALSE, warning=FALSE, echo=FALSE}
+The_t2 <- The_t[The_t$Conso_kWhep.m..an<=250 , ]
+The_t2 <- The_t2[The_t2$Conso_kWhep.m..an>=0, ]
+A<- (The_t$Conso_kWhep.m..an)/1000
+ggplot(The_t2, aes(x = Période_construction, y = Conso_kWhep.m..an )) + 
+  geom_boxplot()+
+  labs(title = "Distribution of annual consumption, all energies included, in kWhep/m².",
+       xaxis = list(title = "Période_construction"),
+      yaxis = list(title = "Annual consumption per m² (kWh)" +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1))) +
+scale_y_continuous(limits = c(0, 100)))
+```
+
+
+
+This box-plot shows how annual energy consumption per square meter (expressed in kWh/m²/year) varies according to the construction period of a building.
+
+
+
+
+**Consumption trends:** There seems to be a downward trend in energy consumption over time. Buildings constructed after 2000 generally have a lower average consumption than those constructed before that date.
+
+
+
+
+**Data dispersion:** The dispersion of consumption is quite large, which means that there are big differences in consumption between buildings built over the same period. This can be explained by differences in size, orientation, insulation, heating systems, etc.
+
+
+
+
+**Particular construction periods:** Some construction periods are characterized by higher or lower average consumption. For example, buildings constructed before 1948 often have higher consumption levels, which can be explained by the absence of energy-efficient construction standards at the time.
+
+
+
+
+```{r test5, message=FALSE, warning=FALSE, echo=FALSE}
+library(plotly)
+plot_ly(data = The_t,
+        x = ~Conso_kWhep.m..an,
+        y = ~Emission_GES_kgCO2.m..an,
+        type = 'scatter',
+        mode = 'markers',
+        frame = ~Période_construction,
+        marker = list(size = 10, color = ~Période_construction)) %>%
+  layout(title = "Relationship between consumption and GHG emissions per m² by construction period",
+         xaxis = list(title = "Consumption (kWhep/m².an)"),
+         yaxis = list(title = "GHG Emission (kgCO2/m².an)"))
+
+```
+
+
+
+
+Click on *Play* to see how it varies.
+
+
+
+
+
+```{r test6, message=FALSE, warning=FALSE, echo=FALSE}
+data_filtered0 <- The_t %>%
+  filter(Etiquette_DPE %in% c("A", "B", "C", "D", "E", "F", "G"))
+ggplot(data = data_filtered0, aes(x = Etiquette_DPE, y = Conso_kWhep.m..an)) +
+  geom_boxplot() +
+  labs(title = "Consumption and GHG emissions per m² by DPE class", x = "DPE Class ", y = "Consumption (kWhep/m²/an)") +
+  scale_y_continuous(limits = c(0, 500))
+```
+
+
+
+**The lower the DPE class (G, F, E), the higher the energy consumption**. 
+A clear trend can be observed: G-rated buildings consume much more energy on average than A-rated buildings.
+
+
+
+**Data dispersion**
+Even within the same class, there is considerable variability in energy consumption. This means that two buildings with the same DPE class can have very different consumption levels. This variability can be explained by many factors, such as building size, orientation, insulation and occupant behavior.
+
+
+
+**Outliers**
+The isolated dots at the top and bottom of the boxes represent buildings that consume much more or much less energy than the average for their class. These buildings can be considered exceptions.
+
+
+
+
+**What are the possible causes of this variation?**
+There are, for example, building-related causes such as insulation, heating system, ventilation, number of inhabitants or even climate.
+
+
+
+```{r test7, message=FALSE, warning=FALSE, echo=FALSE}
+The_t3 <- The_t[The_t$Conso_kWhep.m..an<=15000 , ]
+The_t3 <- The_t3[The_t3$Conso_kWhep.m..an>=0, ]
+data_filtered00 <- The_t3 %>%
+  filter(Etiquette_DPE %in% c("A", "B", "C", "D", "E", "F", "G"))
+ggplot(data = data_filtered00, aes(x = Conso_kWhep.m..an, y = Emission_GES_kgCO2.m..an, color = Etiquette_DPE)) +
+  geom_point() +
+  labs(title = "Consumption and GHG emissions per m² by DPE class", x = "Consumption (kWh/m²/an)", y = " GHG Emission (kgCO2/m²/an)")
+```
+
+
+
+
+After analyzing this graph, we can clearly see that G-class homes are **more numerous** than others. These are the **biggest emitters of greenhouse gases**.
+
+
+
+
+## Consumption and Cost
+
+
+
+```{r test9, message=FALSE, warning=FALSE, echo=FALSE}
+library(ggplot2)
+The_t <- The_t %>% mutate(Frais_annuel_énergie = Frais_annuel_énergie_n.1 + Frais_annuel_énergie_n.2 + Frais_annuel_énergie_n.3)
+data_filtered <- The_t %>%
+  filter(Etiquette_DPE %in% c("A", "B", "C", "D", "E", "F", "G")) %>%
+  filter(!is.na(Frais_annuel_énergie))
+
+taille_echantillon <- min(table(data_filtered$Etiquette_DPE))  
+data_equilibre <- data_filtered %>%
+  group_by(Etiquette_DPE) %>%
+  sample_n(taille_echantillon) %>%
+  ungroup()
+
+ggplot(data_equilibre, aes(x = Etiquette_DPE, y = Frais_annuel_énergie/1000000)) +
+  geom_col() +
+  labs(x = "DPE Class", y = "Average annual energy cost (M€)")
+```
+
+
+
+
+
+
+
+**As you can see from this histogram, class G (the lowest) costs more than classes such as A or B. So it's important to check the class of the home you're about to rent, as it can represent huge energy costs if it has a low class like F or G.**
+
+
+
+
+```{r test, message=FALSE, warning=FALSE, echo=FALSE}
+test<- read.csv2("C:/Users/gnang/Downloads/Opendataproject/consommation-annuelle-residentielle-par-adresse.csv")
+test<- test %>% select(-Code.IRIS, -Nom.IRIS, -Numéro.de.voie, -Indice.de.répétition, -Type.de.voie, -Code.Commune, -Segment.de.client, -Code.EPCI, -Code.Département, -Code.Région, -Tri.des.adresses)
+test$Consommation.annuelle.moyenne.de.la.commune..MWh. <- as.numeric((test$Consommation.annuelle.moyenne.de.la.commune..MWh.))
+test <- test[test$Nom.Commune %in% c("La Rochelle", "Paris") & test$Nombre.de.logements < 150, ]
+data_grouped <- test %>%  group_by(Nombre.de.logements) %>%   summarize(Consommation_moyenne = mean(Consommation.annuelle.moyenne.de.la.commune..MWh.))
+
+ggplot(data_grouped, aes(x = Nombre.de.logements, y = Consommation_moyenne)) +
+                 geom_line(color = "blue") +
+                 labs(x = "Number.of.housing.units", y = "Average_consumption in MWh") +
+             ggtitle("Variation in consumption as a function of the number of dwellings")
+
+```
+
+
+
+
+
+__Is energy consumption in a building really linked to the number of inhabitants?
+If you take a look at this graph, you'll notice that energy consumption varies too greatly according to the number of dwellings. So we have to look elsewhere.__
+
+
+*Let's take a look at the relationship by housing type.*
+
+
+
+
+
+
+```{r test2a, message=FALSE, warning=FALSE, echo=FALSE}
+test10<- read.csv("C:/Users/gnang/Downloads/Opendataproject/dpe-v2-logements-existants-Typelogement-conso.csv")
+test10<- na.omit(test10)
+test10 <- test10 %>% mutate(Conso = Conso_5_usages.m._é_finale + Conso_chauffage_dépensier_é_finale + Conso_éclairage_é_finale + Conso_ECS_dépensier_é_finale + Conso_refroidissement_dépensier_é_finale + Conso_auxiliaires_é_finale)
+
+data_grouped2 <- test10 %>% group_by(Typologie_logement) %>%   summarize(Consommation_totale = sum(Conso))
+data_grouped2 <- data_grouped2[data_grouped2$Typologie_logement != "", ]
+taille_echantillon1 <- min(table(data_grouped2$Typologie_logement))  
+data_equilibre1 <- data_grouped2 %>%
+  group_by(Typologie_logement) %>%
+  sample_n(taille_echantillon1) %>%
+  ungroup()
+ggplot(data_equilibre1, aes(x = Typologie_logement, y = Consommation_totale/1000000, fill = Typologie_logement)) +
+  geom_col() +
+  labs(x = "Housing_type", y = "Total_consumption (Millions of KWh") +
+  ggtitle("Total annual consumption by housing type") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+
+Here we can see that consumption varies according to the type of dwelling.
+To go a step further, we can try to see which type of energy is used most in these homes.
+
+
+
+
+```{r test2a1, message=FALSE, warning=FALSE, echo=FALSE}
+test3<- read.csv("C:/Users/gnang/Downloads/dpe-v2-logements-existants_1.csv")
+test3<-na.omit(test3)
+library(dplyr)
+data_grouped4 <- test3 %>%  group_by(Type_énergie_n.1) %>%   summarize(Cout_totale = Coût_total_5_usages_énergie_n.1)
+library(ggplot2)
+ggplot(data_grouped4, aes(x = Type_énergie_n.1, y = Cout_totale/1000000, fill = Type_énergie_n.1)) +
+    geom_col() +  # Ajout group=1 pour éviter des problèmes si ggplot attend un groupe
+    labs(x = "Type of energy", y = "Total annual cost (M euros)") +
+    ggtitle("Annual cost trend by energy type after 2021") +
+     theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+
+This graph shows the types of energy used by the French on a daily basis. These include electricity, natural gas and heating.
+
+Let's take a look at the estimated energy needs and consumption of the French.
+
+
+
+
+
+```{r test22a, message=FALSE, warning=FALSE, echo=FALSE}
+test4<- read.csv("C:/Users/gnang/Downloads/dpe-v2-logements-existants_2.csv")
+library(dplyr)
+library(ggplot2)
+ The_t<- na.omit(The)
+ test4$Besoin_chauffage <- as.numeric(test4$Besoin_chauffage)
+test4$Besoin_ECS<- as.numeric(test4$Besoin_ECS)
+test4$Besoin_refroidissement<- as.numeric(test4$Besoin_refroidissement)
+ test4 <- test4 %>% mutate(Besoin_totale1 = Besoin_chauffage + Besoin_ECS + Besoin_refroidissement)
+
+data_grouped6 <- test4 %>%  group_by(Typologie_logement) %>%   summarize(Besoin_totale = Besoin_totale1)
+data_grouped6 <- data_grouped6[data_grouped6$Typologie_logement != "", ]
+ ggplot(data_grouped6, aes(x = Typologie_logement, y = Besoin_totale/1000000, fill = Typologie_logement)) +
+             geom_col() +  
+               labs(x = "Housing_type", y = "Annual demand(Millions of KWh)") +
+               ggtitle("Annual energy requirements by housing type after 2021") +
+             theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+
+
+## Need vs. Consumption
+
+
+
+```{r test21a, message=FALSE, warning=FALSE, echo=FALSE}
+testbc<- read.csv("C:/Users/gnang/Downloads/dpe-v2-logements-existants-f.csv")
+
+library(dplyr)
+library(ggplot2)
+testbc<- na.omit(testbc)
+testbc$Besoin_chauffage <- as.numeric(testbc$Besoin_chauffage)
+testbc$Besoin_refroidissement<- as.numeric(testbc$Besoin_refroidissement)
+testbc <- testbc %>% mutate(Difference = Besoin_chauffage + Besoin_refroidissement -  Conso_5_usages_é_finale_énergie_n.1 - Conso_ECS_é_finale_énergie_n.1 - Conso_ECS_é_finale_énergie_n.1 - Conso_5_usages_é_finale_énergie_n.2 - Conso_chauffage_é_finale_énergie_n.2 - Conso_ECS_é_finale_énergie_n.2 - Conso_5_usages_é_finale_énergie_n.3 - Conso_chauffage_é_finale_énergie_n.3 - Conso_ECS_é_finale_énergie_n.3)
+testbc <- testbc %>%  group_by(Typologie_logement) %>%   summarize(Diff = Difference)
+testbc <- testbc[testbc$Typologie_logement != "", ]
+ggplot(testbc, aes(x = Typologie_logement, y = Diff, fill = Typologie_logement)) +
+             geom_col() +  
+               labs(x = "Housing_type", y = "Annual requirement - Consumption (KWh)") +
+               ggtitle("Need vs. Consumption") +
+             theme(axis.text.x = element_text(angle = 45, hjust = 1) +  ylim(-100, 100))
+
+```
+
+
+
+
+
+**The French overconsume, especially for T1, T2 and T4 apartments.**
+
+
+
+
+
+<center><h1 style="color: #ADD8E6;">**Conclusion**</h1></center>
+
+
+_**In conclusion, this study shows that improving DPE classes significantly reduces energy consumption and GHG emissions, while offering significant financial savings. It underlines the urgency of prioritizing energy renovations for a sustainable and equitable future.**_
